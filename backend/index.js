@@ -70,6 +70,7 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 // Upload route
+let parsedExcelData = [];
 app.post('/upload', upload.single('file'), (req, res) => {
     const filePath = path.join(__dirname, 'uploads', req.file.filename);
 
@@ -77,6 +78,7 @@ app.post('/upload', upload.single('file'), (req, res) => {
         const workbook = xlsx.readFile(filePath);
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
         const data = xlsx.utils.sheet_to_json(sheet);
+        parsedExcelData = data;
 
         console.log(data); // You can later save this to MongoDB
         res.json({ message: 'File uploaded successfully', data });
@@ -85,5 +87,23 @@ app.post('/upload', upload.single('file'), (req, res) => {
         res.status(500).json({ error: 'Failed to parse Excel file' });
     }
 });
+app.get('/api/excel-data', (req, res) => {
+    try {
+        const files = fs.readdirSync(path.join(__dirname, 'uploads'));
+        if (files.length === 0) return res.status(404).json([]);
 
+        const latestFile = files.sort((a, b) =>
+            fs.statSync(path.join(__dirname, 'uploads', b)).mtimeMs -
+            fs.statSync(path.join(__dirname, 'uploads', a)).mtimeMs
+        )[0];
+
+        const workbook = xlsx.readFile(path.join(__dirname, 'uploads', latestFile));
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const data = xlsx.utils.sheet_to_json(sheet);
+        res.json(data);
+    } catch (err) {
+        console.error("Error reading Excel:", err);
+        res.status(500).json([]);
+    }
+});
 
